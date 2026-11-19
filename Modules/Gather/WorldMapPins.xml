@@ -1,0 +1,23 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!-- Pino de nó de coleta no mapa-múndi; a lógica está em WorldMapPins.lua. -->
+    <Frame name="QollyGatherPinTemplate" mixin="QollyGatherPinMixin" enableMouse="true" virtual="true">
+        <Size x="10" y="10"/>
+        <Layers>
+            <Layer level="ARTWORK">
+                <Texture parentKey="Icon" setAllPoints="true">
+                    <TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92"/>
+                </Texture>
+                <!-- Recorta o ícone em círculo. -->
+                <MaskTexture parentKey="Mask" file="Interface\CharacterFrame\TempPortraitAlphaMask"
+                    hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE" setAllPoints="true">
+                    <MaskedTextures>
+                        <MaskedTexture childKey="Icon"/>
+                    </MaskedTextures>
+                </MaskTexture>
+            </Layer>
+        </Layers>
+        <Scripts>
+            <OnLoad method="OnLoad"/>
+        </Scripts>
+    </Frame>
+</Ui>

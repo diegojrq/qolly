@@ -1,0 +1,43 @@
+## Interface: 16001
+## Title: Qolly
+## Notes: Suite de utilidades: Snipe (rastreia amigo de Battle.net), Radar (alerta de inimigos), Coleta (ervas e minérios no minimapa), Craft (lucro de receitas), Gear (melhorias na AH), Ganhos (todo ouro que entra e sai, e as vendas da AH), Mercado (oportunidades de revenda, desencanto, vendedor e essências na AH), Pesca (uma tecla lança e puxa), Placas (vida, ameaça, cast e debuffs na placa padrão), Aggro (semáforo na placa dos mobs), Lixo (vende os cinzas no vendedor e protege itens travados), Itens de missão (o que sobrou na bolsa), Buffs (avisa buff de classe faltando), Treino (o que aprender no instrutor e tomos de demônio, numa aba do grimório) e Quests de masmorra (onde pegar cada quest e o passo da cadeia, com o DungeonJournal).
+## Author: Diego
+## Version: 0.23.0
+## SavedVariables: QollyDB
+## OptionalDeps: QuestMaster, ForeverDungeonJournal
+## X-License: GPL-3.0-or-later
+
+Core.lua
+Modules/AH/Scan.lua
+Modules/Snipe.lua
+Modules/Radar.lua
+Modules/Aggro.lua
+Modules/Plates.lua
+Modules/Gather/Data.lua
+Modules/Gather/Nodes.lua
+Modules/Gather/MinimapPins.lua
+Modules/Gather/WorldMapPins.lua
+Modules/Gather/WorldMapPins.xml
+Modules/Gather/Tracking.lua
+Modules/Craft/Prices.lua
+Modules/Craft/Recipe.lua
+Modules/Craft/RecipeRows.lua
+Modules/Craft/RecipeUI.lua
+Modules/Craft/Craft.lua
+Modules/Gear/Gear.lua
+Modules/Gear/Score.lua
+Modules/Gear/UpgradeList.lua
+Modules/Gear/CharacterScore.lua
+Modules/Gear/Tooltip.lua
+Modules/Sales.lua
+Modules/Income.lua
+Modules/Market.lua
+Modules/Fishing.lua
+Modules/Junk.lua
+Modules/QuestItems.lua
+Modules/Buffs.lua
+Modules/Training/Data.lua
+Modules/Training/Training.lua
+Modules/AH/Tab.lua
+Modules/DungeonQuests.lua
+Modules/Options.lua
