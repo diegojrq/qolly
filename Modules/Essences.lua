@@ -217,10 +217,150 @@ events:SetScript("OnEvent", function(_, event, ...)
     end
 end)
 
+-- Operações: compras de essência na AH -------------------------------------------------
+-- A compra de commodity passa por StartCommoditiesPurchase (o jogo devolve o preço total
+-- em COMMODITY_PRICE_UPDATED) e ConfirmCommoditiesPurchase; o sucesso chega por evento
+-- ou pela mensagem "Você ganhou um leilão de ...". As vendas vêm do módulo de vendas
+-- (cartas da AH no correio).
+
+local MAX_TRADES = 2000
+local pendingBuy
+
+local function Estimate(itemID, quantity)
+    local price = db.prices[itemID]
+    if not price then
+        return nil
+    end
+    local left, total = quantity, 0
+    for _, listing in ipairs(price.l or {}) do
+        local take = math.min(left, listing[2])
+        total, left = total + take * listing[1], left - take
+        if left == 0 then
+            return total
+        end
+    end
+    return total + left * price.p
+end
+
+local function AddTrade(itemID, quantity, total, source)
+    db.trades[#db.trades + 1] = { t = time(), id = itemID, qty = quantity, total = total, src = source }
+    while #db.trades > MAX_TRADES do
+        table.remove(db.trades, 1)
+    end
+    local name = C_Item.GetItemNameByID(itemID) or ("item " .. itemID)
+    Qolly.Log(("Essências: compra %dx %s por %s (%s)"):format(quantity, name, tostring(total), source))
+    Qolly.Print(("Essências: compra de %dx %s por %s registrada."):format(quantity, name, Qolly.Money(total or 0)))
+end
+
+local function FinishBuy()
+    local buy = pendingBuy
+    pendingBuy = nil
+    if not (buy and buy.confirmed and buy.qty and buy.qty > 0) then
+        return
+    end
+    local total = buy.total or Estimate(buy.id, buy.qty)
+    AddTrade(buy.id, buy.qty, total, buy.total and "ah" or "ah estimado")
+    Changed()
+end
+
+local function HookAH(name, handler)
+    if C_AuctionHouse and C_AuctionHouse[name] then
+        hooksecurefunc(C_AuctionHouse, name, function(...)
+            if db then
+                pcall(handler, ...)
+            end
+        end)
+    end
+end
+
+HookAH("StartCommoditiesPurchase", function(itemID, quantity)
+    if WANTED[itemID] then
+        pendingBuy = { id = itemID, qty = quantity }
+    else
+        pendingBuy = nil
+    end
+end)
+
+HookAH("ConfirmCommoditiesPurchase", function(itemID, quantity)
+    if not WANTED[itemID] then
+        return
+    end
+    if not (pendingBuy and pendingBuy.id == itemID) then
+        pendingBuy = { id = itemID }
+    end
+    pendingBuy.qty = quantity or pendingBuy.qty
+    pendingBuy.confirmed = true
+end)
+
+local buyEvents = CreateFrame("Frame")
+for _, event in ipairs({ "COMMODITY_PRICE_UPDATED", "COMMODITY_PURCHASE_SUCCEEDED",
+    "COMMODITY_PURCHASE_FAILED", "CHAT_MSG_SYSTEM" }) do
+    pcall(buyEvents.RegisterEvent, buyEvents, event)
+end
+buyEvents:SetScript("OnEvent", function(_, event, first, second)
+    if not (db and pendingBuy) then
+        return
+    end
+    if event == "COMMODITY_PRICE_UPDATED" then
+        if Plain(second) and not pendingBuy.confirmed then
+            pendingBuy.total = second
+        end
+    elseif event == "COMMODITY_PURCHASE_SUCCEEDED" then
+        Qolly.Safe("essências", FinishBuy)
+    elseif event == "COMMODITY_PURCHASE_FAILED" then
+        pendingBuy = nil
+    elseif event == "CHAT_MSG_SYSTEM" and pendingBuy.confirmed and Plain(first) then
+        local name = C_Item.GetItemNameByID(pendingBuy.id)
+        if name and first:find(name, 1, true) then
+            Qolly.Safe("essências", FinishBuy)
+        end
+    end
+end)
+
+-- Compras e vendas de um tipo: totais e a lista, mais nova primeiro.
+local function Operations(pair)
+    local names = {}
+    for _, id in ipairs(pair) do
+        local name = C_Item.GetItemNameByID(id)
+        if name then
+            names[name] = id
+        end
+    end
+    local ops = { bought = { [pair[1]] = 0, [pair[2]] = 0 }, sold = { [pair[1]] = 0, [pair[2]] = 0 },
+        spent = 0, got = 0, list = {} }
+    local first
+    for _, trade in ipairs(db.trades) do
+        if trade.id == pair[1] or trade.id == pair[2] then
+            first = first or trade.t
+            ops.bought[trade.id] = ops.bought[trade.id] + trade.qty
+            ops.spent = ops.spent + (trade.total or 0)
+            ops.list[#ops.list + 1] = { t = trade.t, id = trade.id, qty = trade.qty, money = -(trade.total or 0), buy = true }
+        end
+    end
+    if first and Qolly.Sales and Qolly.Sales.Entries then
+        for _, sale in ipairs(Qolly.Sales.Entries()) do
+            local id = (sale.id == pair[1] or sale.id == pair[2]) and sale.id or names[sale.name]
+            if id and sale.t >= first - 60 then
+                local net = (sale.sale or 0) - (sale.cut or 0)
+                ops.sold[id] = ops.sold[id] + (sale.count or 1)
+                ops.got = ops.got + net
+                ops.list[#ops.list + 1] = { t = sale.t, id = id, qty = sale.count or 1, money = net }
+            end
+        end
+    end
+    table.sort(ops.list, function(a, b)
+        return a.t > b.t
+    end)
+    -- Estoque contado em inferiores: cada maior vale 3.
+    ops.stock = 3 * (ops.bought[pair[2]] - ops.sold[pair[2]]) + ops.bought[pair[1]] - ops.sold[pair[1]]
+    ops.any = first ~= nil
+    return ops
+end
+
 -- Página ---------------------------------------------------------------------------------
 
 local GREEN, RED, GREY, GOLD = "|cff66ff66", "|cffff6666", "|cff999999", "|cffffd100"
-local ROW_HEIGHT = 26
+local ROW_HEIGHT = 30
 local HISTORY_LINES = 14
 local LINE = 13
 local COLUMNS = {
@@ -268,12 +408,12 @@ local function SearchWord()
     return name and name:match("^(%S+)") or "Essência"
 end
 
+-- Preço e, embaixo, quantas há e de quando.
 local function PriceText(price)
     if not price then
-        return GREY .. "sem preço|r"
+        return GREY .. "sem preço|r", ""
     end
-    return Qolly.Money(price.p) .. "\n" .. GREY .. ("%d na AH · %s há %s"):format(
-        price.q, price.src or "scan", Qolly.Ago(time() - price.at)) .. "|r"
+    return Qolly.Money(price.p), ("%d · %s %s"):format(price.q, price.src or "scan", Qolly.Ago(time() - price.at))
 end
 
 local function DealText(side)
@@ -292,12 +432,12 @@ local function Line(index)
         line = {}
         line.left = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         line.left:SetPoint("TOPLEFT", parent, "TOPLEFT", 8, -8 - (index - 1) * LINE)
-        line.left:SetWidth(250)
+        line.left:SetWidth(230)
         line.left:SetJustifyH("LEFT")
         line.left:SetWordWrap(false)
         line.right = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        line.right:SetPoint("TOPLEFT", parent, "TOPLEFT", 262, -8 - (index - 1) * LINE)
-        line.right:SetWidth(110)
+        line.right:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -8, -8 - (index - 1) * LINE)
+        line.right:SetWidth(130)
         line.right:SetJustifyH("RIGHT")
         lines[index] = line
     end
@@ -340,10 +480,77 @@ local function Account(deal)
         end
     end
     Add("")
-    Add(GREY .. ("Vender pelo menor preço depende da fila: há %d Inferiores|r"):format(lesser.q))
-    Add(GREY .. ("e %d Maiores anunciadas. O depósito do anúncio não entra.|r"):format(greater.q))
+    Add(GREY .. ("Na fila de venda: %d Inferiores e %d Maiores.|r"):format(lesser.q, greater.q))
+    Add(GREY .. "O depósito do anúncio não entra na conta.|r")
     return out
 end
+
+local function Size(id, pair)
+    return id == pair[2] and "Maior" or "Inferior"
+end
+
+local function OperationsLines(index)
+    local pair = PAIRS[index]
+    local ops = Operations(pair)
+    local out = {}
+    local function Add(left, right)
+        out[#out + 1] = { left, right or "" }
+    end
+    if not ops.any then
+        Add(GREY .. "Nenhuma compra registrada deste tipo.|r")
+        Add(GREY .. "Compras na AH entram sozinhas; as vendas entram|r")
+        Add(GREY .. "quando você abre o correio. Para uma compra antiga:|r")
+        Add(GREY .. "/qolly essencias compra 6 eterna maior 2g50s80c|r")
+        return out
+    end
+    for _, id in ipairs({ pair[2], pair[1] }) do
+        if ops.bought[id] > 0 then
+            local spent = 0
+            for _, op in ipairs(ops.list) do
+                if op.buy and op.id == id then
+                    spent = spent - op.money
+                end
+            end
+            Add(("  Comprou %d %s"):format(ops.bought[id], Size(id, pair)), "-" .. Qolly.Money(spent))
+        end
+    end
+    for _, id in ipairs({ pair[1], pair[2] }) do
+        if ops.sold[id] > 0 then
+            local got = 0
+            for _, op in ipairs(ops.list) do
+                if not op.buy and op.id == id then
+                    got = got + op.money
+                end
+            end
+            Add(("  Vendeu %d %s (já sem a taxa)"):format(ops.sold[id], Size(id, pair)), "+" .. Qolly.Money(got))
+        end
+    end
+    local balance = ops.got - ops.spent
+    Add("  Saldo até agora", Colored(balance, Signed(balance)))
+    local lesser = db.prices[pair[1]]
+    if ops.stock > 0 then
+        local value = lesser and ops.stock * lesser.p * AH_CUT
+        Add(("  Falta vender: %d Inferiores (contando 3 por Maior)"):format(ops.stock),
+            value and ("~" .. Qolly.Money(value)) or "")
+        if value then
+            local result = balance + value
+            Add("  Resultado vendendo o resto a " .. Qolly.Money(lesser.p),
+                Colored(result, Signed(result) .. (ops.spent > 0 and (" (" .. Pct(result / ops.spent) .. ")") or "")))
+        end
+    elseif ops.spent > 0 then
+        Add("  Resultado", Colored(balance, Signed(balance) .. " (" .. Pct(balance / ops.spent) .. ")"))
+    end
+    Add("")
+    Add(GOLD .. "Últimas|r")
+    for line = 1, math.min(#ops.list, 8) do
+        local op = ops.list[line]
+        Add(("  %s  %s %d %s"):format(date("%d/%m %H:%M", op.t), op.buy and "compra" or "venda", op.qty, Size(op.id, pair)),
+            Colored(op.money, Signed(op.money)))
+    end
+    Add(GREY .. "Vendas entram quando você abre o correio.|r")
+    return out
+end
+
 
 local function ShowHistory(index)
     local log = db.log[index] or {}
@@ -404,8 +611,10 @@ function Essences.Refresh()
         local deal = Deal(pair)
         row.icon:SetTexture(C_Item.GetItemIconByID(pair[2]) or 134400)
         row.name:SetText(TierName(index))
-        row.lesser:SetText(PriceText(db.prices[pair[1]]))
-        row.greater:SetText(PriceText(db.prices[pair[2]]))
+        row.lesser.price:SetText((PriceText(db.prices[pair[1]])))
+        row.lesser.sub:SetText(select(2, PriceText(db.prices[pair[1]])))
+        row.greater.price:SetText((PriceText(db.prices[pair[2]])))
+        row.greater.sub:SetText(select(2, PriceText(db.prices[pair[2]])))
         row.split:SetText(DealText(deal and deal.split))
         row.join:SetText(DealText(deal and deal.join))
         row.selected:SetShown(index == selected)
@@ -417,22 +626,37 @@ function Essences.Refresh()
         end
     end
 
-    local deal = Deal(PAIRS[selected])
-    local account = deal and Account(deal) or {
-        { GREY .. "Sem os preços de " .. TierName(selected) .. ".|r", "" },
-        { GREY .. "Faça um scan ou clique em Atualizar preços.|r", "" },
-    }
-    frame.accountTitle:SetText(GOLD .. "A conta: " .. TierName(selected) .. "|r")
+    local account
+    if db.view == "ops" then
+        account = OperationsLines(selected)
+        frame.accountTitle:SetText(GOLD .. "Minhas operações: " .. TierName(selected) .. "|r")
+    else
+        local deal = Deal(PAIRS[selected])
+        account = deal and Account(deal) or {
+            { GREY .. "Sem os preços de " .. TierName(selected) .. ".|r", "" },
+            { GREY .. "Faça um scan ou clique em Atualizar preços.|r", "" },
+        }
+        frame.accountTitle:SetText(GOLD .. "A conta: " .. TierName(selected) .. "|r")
+    end
     for index = 1, math.max(#account, #lines) do
         local line = Line(index)
         local entry = account[index]
+        local right = entry and entry[2] or ""
         line.left:SetText(entry and entry[1] or "")
-        line.right:SetText(entry and entry[2] or "")
+        line.left:SetWidth(right == "" and 364 or 230)
+        line.right:SetText(right)
+    end
+    for _, button in ipairs(frame.views) do
+        if button.key == (db.view or "conta") then
+            button:LockHighlight()
+        else
+            button:UnlockHighlight()
+        end
     end
     ShowHistory(selected)
 
     if oldest then
-        frame.status:SetText(("Preço mais antigo: há %s. Atualizar preços pesquisa \"%s\" na AH; abrir uma essência na AH traz os anúncios dela."):format(
+        frame.status:SetText(("Preço mais antigo: %s. Atualizar pesquisa \"%s\"; abrir uma essência na AH traz os anúncios dela."):format(
             Qolly.Ago(time() - oldest), SearchWord()))
     else
         frame.status:SetText("Sem preços ainda: faça um scan ou clique em Atualizar preços.")
@@ -464,8 +688,22 @@ local function CreateRow(index)
     row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
     row.name:SetWidth(COLUMNS[1].width - 30)
     row.name:SetWordWrap(false)
-    row.lesser = Text(2)
-    row.greater = Text(3)
+    local function Price(column)
+        local cell = {}
+        cell.price = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        cell.price:SetPoint("TOPLEFT", row, "TOPLEFT", COLUMNS[column].x, -3)
+        cell.price:SetWidth(COLUMNS[column].width)
+        cell.price:SetJustifyH("LEFT")
+        cell.price:SetWordWrap(false)
+        cell.sub = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        cell.sub:SetPoint("TOPLEFT", row, "TOPLEFT", COLUMNS[column].x, -16)
+        cell.sub:SetWidth(COLUMNS[column].width)
+        cell.sub:SetJustifyH("LEFT")
+        cell.sub:SetWordWrap(false)
+        return cell
+    end
+    row.lesser = Price(2)
+    row.greater = Price(3)
     row.split = Text(4)
     row.join = Text(5)
     row:SetScript("OnClick", function()
@@ -496,7 +734,28 @@ local function CreatePage(parent)
 
     frame.status = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     frame.status:SetPoint("LEFT", refresh, "RIGHT", 8, 0)
-    frame.status:SetWidth(590)
+    frame.status:SetWidth(380)
+    frame.status:SetWordWrap(true)
+
+    frame.views = {}
+    local previous
+    for _, view in ipairs({ { key = "ops", label = "Operações" }, { key = "conta", label = "A conta" } }) do
+        local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        button:SetSize(100, 22)
+        button:SetText(view.label)
+        button.key = view.key
+        if previous then
+            button:SetPoint("RIGHT", previous, "LEFT", -4, 0)
+        else
+            button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -6)
+        end
+        button:SetScript("OnClick", function()
+            db.view = view.key
+            Essences.Refresh()
+        end)
+        frame.views[#frame.views + 1] = button
+        previous = button
+    end
     frame.status:SetJustifyH("LEFT")
 
     for _, column in ipairs(COLUMNS) do
@@ -569,9 +828,57 @@ function Essences.Embed(parent)
     return frame
 end
 
+local TIER_WORDS = {
+    magica = 1, ["mágica"] = 1, astral = 2, mistica = 3, ["mística"] = 3,
+    eter = 4, eterea = 4, ["etérea"] = 4, eterna = 5,
+}
+
+-- "2g50s80c", "50s", "25080" -> cobre
+local function ParseMoney(text)
+    if not text then
+        return nil
+    end
+    if text:match("^%d+$") then
+        return tonumber(text)
+    end
+    local total, found = 0, false
+    for amount, unit in text:gmatch("(%d+)([gsc])") do
+        total = total + tonumber(amount) * (unit == "g" and 10000 or unit == "s" and 100 or 1)
+        found = true
+    end
+    return found and total or nil
+end
+
+-- /qolly essencias compra <qtd> <tipo> <maior|inferior> <preço de cada>
+local function ManualBuy(argument)
+    local qty, tier, size, price = argument:match("^compra%s+(%d+)%s+(%S+)%s+(%S+)%s+(%S+)")
+    local index = tier and TIER_WORDS[tier:lower()]
+    local unit = ParseMoney(price)
+    size = size and size:lower()
+    if not (qty and index and unit and (size == "maior" or size == "inferior" or size == "menor")) then
+        Qolly.Print("Uso: /qolly essencias compra 6 eterna maior 2g50s80c  (tipos: magica, astral, mistica, eterea, eterna)")
+        return
+    end
+    local id = PAIRS[index][size == "maior" and 2 or 1]
+    qty = tonumber(qty)
+    AddTrade(id, qty, unit * qty, "manual")
+    Changed()
+end
+
 Qolly.RegisterModule("essencias", {
-    help = "(quebrar ou juntar essências: lucro de cada tipo com os últimos preços)",
-    command = function()
+    help = "(lucro de quebrar/juntar; \"compra 6 eterna maior 2g50s80c\" registra uma compra; \"desfaz\" apaga a última)",
+    command = function(argument)
+        argument = argument or ""
+        if argument:match("^compra") then
+            ManualBuy(argument)
+            return
+        elseif argument == "desfaz" then
+            local last = table.remove(db.trades)
+            Qolly.Print(last and ("Essências: removida a compra de %dx %s."):format(last.qty,
+                C_Item.GetItemNameByID(last.id) or last.id) or "Essências: nenhuma compra para remover.")
+            Essences.Refresh()
+            return
+        end
         local any = false
         for index, pair in ipairs(PAIRS) do
             local deal = Deal(pair)
@@ -590,5 +897,6 @@ Qolly.RegisterModule("essencias", {
         db = saved
         db.prices = db.prices or {}
         db.log = db.log or {}
+        db.trades = db.trades or {}
     end,
 })

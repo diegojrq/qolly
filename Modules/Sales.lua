@@ -461,6 +461,11 @@ function Sales.Toggle()
     Qolly.Options.Open("Ganhos")
 end
 
+-- Todos os registros de venda (as essências somam as delas).
+function Sales.Entries()
+    return db and db.sales or {}
+end
+
 Qolly.RegisterModule("vendas", {
     help = "(lucro na AH por item e por categoria)",
     command = function()

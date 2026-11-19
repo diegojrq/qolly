@@ -7,6 +7,9 @@
   5% da AH. Mostra a conta passo a passo, até quanto compensa pagar, quantas na AH estão
   abaixo disso e o histórico das margens. Os preços vêm do scan e das buscas normais na
   AH (botão "Atualizar preços"). `/qolly essencias` resume no chat.
+- **Essências, operações**: compras de essência na AH são registradas sozinhas e as
+  vendas vêm do correio; a página mostra o gasto, o recebido, o que falta vender e o
+  resultado. `/qolly essencias compra 6 eterna maior 2g50s80c` registra uma compra à mão.
 
 ## 0.23.0
 
