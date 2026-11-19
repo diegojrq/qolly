@@ -10,7 +10,7 @@ local ICON = "Interface\\Icons\\INV_Misc_Gear_01"
 local db, panel, button
 
 local function Version()
-    return C_AddOns.GetAddOnMetadata("Qolly", "Version") or "?"
+    return Qolly.Version()
 end
 
 -- Opções agrupadas por módulo. Cada uma: rótulo, leitura, escrita e dica opcional.

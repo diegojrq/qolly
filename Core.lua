@@ -22,6 +22,13 @@ function Qolly.Log(message)
     end
 end
 
+-- O empacotador troca @project-version@ pela tag; numa cópia direto do repositório fica "dev".
+function Qolly.Version()
+    local version = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "?"
+    if version:find("^@") then return "dev" end
+    return version
+end
+
 function Qolly.Print(message)
     print(PREFIX .. message)
     Qolly.Log(message)
@@ -136,7 +143,7 @@ loader:SetScript("OnEvent", function(self, _, loadedAddon)
     end
 
     -- A versão vem do .toc: se o chat mostra uma velha, o jogo não releu os arquivos.
-    local version = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "?"
+    local version = Qolly.Version()
     local names = table.concat(Qolly.moduleOrder, ", ")
     Qolly.Print(("v%s carregado (%s). Digite /qolly para os comandos."):format(version, names))
 end)

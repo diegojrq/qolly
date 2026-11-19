@@ -1,7 +1,13 @@
 package-as: Qolly
 
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 ignore:
   - tools
   - docs
   - install.ps1
   - .gitignore
+  - .github
+  - README.md
