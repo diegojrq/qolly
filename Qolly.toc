@@ -2,6 +2,7 @@
 ## Title: Qolly
 ## Notes: Suite de utilidades: Snipe (rastreia amigo de Battle.net), Radar (alerta de inimigos), Coleta (ervas e minérios no minimapa), Craft (lucro de receitas), Gear (melhorias na AH), Ganhos (todo ouro que entra e sai, e as vendas da AH), Mercado (oportunidades de revenda, desencanto, vendedor e essências na AH), Pesca (uma tecla lança e puxa), Placas (vida, ameaça, cast e debuffs na placa padrão), Aggro (semáforo na placa dos mobs), Lixo (vende os cinzas no vendedor e protege itens travados), Itens de missão (o que sobrou na bolsa), Buffs (avisa buff de classe faltando), Treino (o que aprender no instrutor e tomos de demônio, numa aba do grimório) e Quests de masmorra (onde pegar cada quest e o passo da cadeia, com o DungeonJournal).
 ## Author: Diego
+## IconTexture: Interface\AddOns\Qolly\Media\Logo
 ## Version: 0.23.0
 ## SavedVariables: QollyDB
 ## OptionalDeps: QuestMaster, ForeverDungeonJournal

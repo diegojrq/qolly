@@ -5,6 +5,8 @@ equipamento, vendas, oportunidades de lucro), treino no grimório com os tomos d
 quests de masmorra com o passo da cadeia, aviso de buffs e bônus de XP, coleta no
 minimapa, lucro de receitas, placas, radar e mais.
 
+![Qolly](docs/logo.png)
+
 Descrição completa (português e inglês): [docs/curseforge.md](docs/curseforge.md).
 Mudanças: [CHANGELOG.md](CHANGELOG.md). Créditos: [CREDITS.md](CREDITS.md).
 
