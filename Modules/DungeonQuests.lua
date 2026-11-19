@@ -134,8 +134,29 @@ local function State(ns, quest)
     return { kind = "ready", map = StartMap(ns, quest.id) }
 end
 
--- Masmorras com quests para você, ordenadas pelo nível.
-local function Dungeons(all)
+local function DJFrame()
+    return _G[DJ_FRAME]
+end
+
+-- A masmorra aberta na janela do DungeonJournal, quando ela mostra uma (e não a página
+-- inicial) e a opção de seguir o Journal está ligada.
+local function JournalDungeon()
+    local ns, host = Data(), DJFrame()
+    if db.follow == false or not (ns and host and host:IsShown()) then
+        return nil
+    end
+    if host.currentView ~= "dungeon" or type(ns.GetSelectedDungeon) ~= "function" then
+        return nil
+    end
+    local ok, key = pcall(ns.GetSelectedDungeon)
+    if ok and key and type(ns.DB[key]) == "table" then
+        return key
+    end
+end
+
+-- Masmorras com quests para você, ordenadas pelo nível. Com `only`, só aquela masmorra,
+-- seja qual for o nível.
+local function Dungeons(all, only)
     local ns = Data()
     local list = {}
     if not ns then
@@ -143,9 +164,9 @@ local function Dungeons(all)
     end
     local level = UnitLevel("player") or 0
     for name, dungeon in pairs(ns.DB) do
-        if type(dungeon) == "table" and type(dungeon.quests) == "table" then
+        if type(dungeon) == "table" and type(dungeon.quests) == "table" and (not only or name == only) then
             local low, high = LevelRange(dungeon.level)
-            if all or (level >= low - BELOW and level <= high + ABOVE) then
+            if only or all or (level >= low - BELOW and level <= high + ABOVE) then
                 local quests = {}
                 local done = 0
                 for _, quest in ipairs(dungeon.quests) do
@@ -370,7 +391,9 @@ function DQ.Refresh()
     for _, header in ipairs(headers) do
         header:Hide()
     end
-    local list = Dungeons(db.all)
+    local only = JournalDungeon()
+    panel.following = only
+    local list = Dungeons(db.all, only)
     local y, rowIndex, headerIndex = 0, 0, 0
     local width = panel.scroll:GetWidth()
     local available = 0
@@ -381,6 +404,9 @@ function DQ.Refresh()
         header:SetPoint("TOPLEFT", 0, -y)
         header:SetWidth(width)
         header.icon:SetTexture(dungeon.icon or "Interface/Icons/INV_Misc_Book_09")
+        if only then
+            collapsed[dungeon.name] = nil
+        end
         header.text:SetText((collapsed[dungeon.name] and "+ " or "") .. dungeon.name)
         header.info:SetText(("nível %d-%d  ·  %d feita(s)"):format(dungeon.low, dungeon.high, dungeon.done))
         header:Show()
@@ -407,14 +433,12 @@ function DQ.Refresh()
         y = y + 6
     end
     panel.content:SetHeight(math.max(1, y))
+    panel.empty:SetText(only and "Nenhuma quest desta masmorra para você."
+        or "Nenhuma quest de masmorra para o seu nível.")
     panel.empty:SetShown(#list == 0)
     if tab then
         tab:SetCount(available)
     end
-end
-
-local function DJFrame()
-    return _G[DJ_FRAME]
 end
 
 local function Layout()
@@ -465,7 +489,8 @@ local function CreatePanel()
     panel:SetClampedToScreen(true)
     tinsert(UISpecialFrames, "QollyDungeonQuests")
 
-    local all = OptionButton("Todas as masmorras", "all")
+    local follow = OptionButton("Seguir o Journal", "follow")
+    local all = OptionButton("Todas as masmorras", "all", follow)
     OptionButton("Mostrar feitas", "showDone", all)
 
     panel.scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
@@ -487,6 +512,18 @@ local function CreatePanel()
         DQ.Refresh()
     end)
     panel:SetScript("OnHide", Layout)
+    -- Trocou de masmorra (ou voltou à página inicial) no Journal: a lista acompanha.
+    local elapsed = 0
+    panel:SetScript("OnUpdate", function(_, delta)
+        elapsed = elapsed + delta
+        if elapsed < 0.3 then
+            return
+        end
+        elapsed = 0
+        if JournalDungeon() ~= panel.following then
+            Qolly.Safe("quests de masmorra", DQ.Refresh)
+        end
+    end)
 end
 
 function DQ.SetOpen(open)
@@ -593,6 +630,9 @@ Qolly.RegisterModule("masmorras", {
         db = saved
         if db.showDone == nil then
             db.showDone = false
+        end
+        if db.follow == nil then
+            db.follow = true
         end
     end,
     command = function()
