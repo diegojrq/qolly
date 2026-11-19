@@ -34,6 +34,7 @@ Modules/Gear/Tooltip.lua
 Modules/Sales.lua
 Modules/Income.lua
 Modules/Market.lua
+Modules/Essences.lua
 Modules/Fishing.lua
 Modules/Junk.lua
 Modules/QuestItems.lua

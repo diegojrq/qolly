@@ -1,4 +1,4 @@
--- Páginas do Qolly na casa de leilão (melhorias de equipamento, vendas, oportunidades),
+-- Páginas do Qolly na casa de leilão (melhorias, vendas, oportunidades, essências),
 -- num painel ao lado da janela da AH com abas laterais, como o painel de treino do
 -- grimório. Não mexe na fileira de abas da AH: interfaces que remontam a AH inteira
 -- (EllesmereUI, ElvUI) quebravam a aba que ficava lá.
@@ -20,6 +20,9 @@ local PAGES = {
     { key = "market", label = "Oportunidades", icon = "Interface/Icons/INV_Enchant_EssenceEternalLarge",
         tip = "Revenda, desencanto, vendedor e essências com lucro.",
         embed = function(parent) return Qolly.Market.Embed(parent) end },
+    { key = "essences", label = "Essências", icon = "Interface/Icons/INV_Enchant_EssenceMagicLarge",
+        tip = "Quebrar ou juntar essências: lucro, margem e histórico de cada tipo.",
+        embed = function(parent) return Qolly.Essences.Embed(parent) end },
 }
 
 local panel, area

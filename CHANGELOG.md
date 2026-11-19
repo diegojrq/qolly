@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.24.0
+
+- **Essências** (novo): página no painel Qolly da AH com o lucro de quebrar 1 Maior em 3
+  Inferiores e de juntar 3 Inferiores em 1 Maior, para cada tipo de essência, já sem os
+  5% da AH. Mostra a conta passo a passo, até quanto compensa pagar, quantas na AH estão
+  abaixo disso e o histórico das margens. Os preços vêm do scan e das buscas normais na
+  AH (botão "Atualizar preços"). `/qolly essencias` resume no chat.
+
 ## 0.23.0
 
 - **Quests de masmorra** (novo): aba lateral na janela do DungeonJournal e
