@@ -2,6 +2,11 @@
 
 ## 0.24.0
 
+- **Profissões** (novo): página no painel Qolly da AH com as receitas de cada profissão
+  sua: custo dos mats, venda (sem os 5% da AH), lucro e %, ordenadas pelo lucro. O
+  filtro "Sobem skill" esconde as cinzas, para upar ganhando ou gastando o mínimo; a cor
+  do nome é a da janela da profissão. Clique mostra a conta mat por mat; botão direito
+  busca o item na AH. Mats só de vendedor entram com preço estimado.
 - **Essências** (novo): página no painel Qolly da AH com o lucro de quebrar 1 Maior em 3
   Inferiores e de juntar 3 Inferiores em 1 Maior, para cada tipo de essência, já sem os
   5% da AH. Mostra a conta passo a passo, até quanto compensa pagar, quantas na AH estão

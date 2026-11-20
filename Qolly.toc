@@ -26,6 +26,7 @@ Modules/Craft/Recipe.lua
 Modules/Craft/RecipeRows.lua
 Modules/Craft/RecipeUI.lua
 Modules/Craft/Craft.lua
+Modules/Craft/Professions.lua
 Modules/Gear/Gear.lua
 Modules/Gear/Score.lua
 Modules/Gear/UpgradeList.lua

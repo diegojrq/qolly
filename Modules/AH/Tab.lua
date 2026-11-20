@@ -23,6 +23,9 @@ local PAGES = {
     { key = "essences", label = "Essências", icon = "Interface/Icons/INV_Enchant_EssenceMagicLarge",
         tip = "Quebrar ou juntar essências: lucro, margem e histórico de cada tipo.",
         embed = function(parent) return Qolly.Essences.Embed(parent) end },
+    { key = "professions", label = "Profissões", icon = "Interface/Icons/Trade_Alchemy",
+        tip = "Receitas das suas profissões: mats x venda e o lucro, e quais ainda sobem skill.",
+        embed = function(parent) return Qolly.Professions.Embed(parent) end },
 }
 
 local panel, area
